@@ -138,7 +138,7 @@ vblankwait2:
     ; Write sprite data for sprite 0
     LDA #120     ; Y position
     STA sprite_player + SPRITE_Y
-    LDA #0       ; Tile number
+    LDA #3       ; Tile number
     STA sprite_player + SPRITE_TILE
     LDA #0       ; Attributes
     STA sprite_player + SPRITE_ATTRIB
@@ -220,12 +220,15 @@ ReadRight_Done:
     LDA joypad1_state
     AND #BUTTON_A
     BEQ ReadA_Done  
-    ; Spawn a bullet
+    ; Spawn a bullet if one is not active
+    LDA bullet_active
+    BNE ReadA_Done
+    ; no bullet active, so spawn one
     LDA #1
     STA bullet_active
     LDA sprite_player + SPRITE_Y    ; Y position
     STA sprite_bullet+ SPRITE_Y
-    LDA #2                          ; Tile number
+    LDA #16                         ; Tile number
     STA sprite_bullet + SPRITE_TILE
     LDA #0                          ; Attributes
     STA sprite_bullet + SPRITE_ATTRIB
