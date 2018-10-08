@@ -14,6 +14,8 @@ PPUSCROLL = $2005
 PPUADDR   = $2006
 PPUDATA   = $2007
 OAMDMA    = $4014
+JOYPAD1 = $4016
+JOYPAD2 = $4017
 
 
     .bank 0
@@ -91,7 +93,24 @@ vblankwait2:
     STA PPUADDR
 
     ; Write the background colour
-    LDA #7
+    LDA #$0
+    STA PPUDATA
+
+    ; Write the palette colours
+    LDA #$30
+    STA PPUDATA
+    LDA #$19
+    STA PPUDATA
+    LDA #$05
+    STA PPUDATA
+
+    LDA #$0
+    STA PPUDATA
+    LDA #$25
+    STA PPUDATA
+    LDA #$13
+    STA PPUDATA
+    LDA #$07
     STA PPUDATA
 
     ; Write sprite data for sprite 0
@@ -103,6 +122,16 @@ vblankwait2:
     STA $0202 
     LDA #128     ; X position
     STA $0203
+
+    ; Write sprite data for sprite 1
+    LDA #60     ; Y position
+    STA $0204
+    LDA #1       ; Tile number
+    STA $0205
+    LDA #1       ; Attributes
+    STA $0206 
+    LDA #190     ; X position
+    STA $0207
 
     LDA  #%10000000 ; Enable NMI
     STA PPUCTRL
@@ -118,18 +147,34 @@ forever:
 
 ; NMI is called on every frame
 NMI:
-    ; Increment x position of sprite
+    ; Initialise controller 1
+    LDA #1
+    STA JOYPAD1
+    LDA #0
+    STA JOYPAD1
+
+    ; Read A button
+    LDA JOYPAD1
+    AND #%00000001
+    BEQ ReadA_Done   ; if statement
     LDA $0203
     CLC
-    ADC #-4
+    ADC #1
+    STA $0203
+ReadA_Done:
+
+; Read B button
+    LDA JOYPAD1
+    AND #%00000001
+    BEQ ReadB_Done   ; if statement
+    LDA $0203
+    CLC
+    ADC #-1
     STA $0203
 
-    ; Increment x position of sprite
-    LDA $0200
-    CLC
-    ADC #3
-    STA $0200
+ReadB_Done:
 
+    ; Copy sprite data to the PPU
     LDA #0
     STA OAMADDR
     LDA #$02
@@ -149,5 +194,5 @@ NMI:
 
     .bank 2
     .org $0000
-    ; TODO: add graphics
+    .incbin "comp310.chr"
 
