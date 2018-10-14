@@ -26,41 +26,17 @@ BUTTON_DOWN   = %00000100
 BUTTON_LEFT   = %00000010
 BUTTON_RIGHT  = %00000001
 
-ENEMY_SQUAD_WIDTH    = 6
-ENEMY_SQUAD_HEIGHT   = 4
-NUM_ENEMIES          = ENEMY_SQUAD_WIDTH * ENEMY_SQUAD_HEIGHT
-ENEMY_SPACING        = 16
-ENEMY_DESCENT_SPEED  = 4
-
-ENEMY_HITBOX_WIDTH   = 8
-ENEMY_HITBOX_HEIGHT  = 8
-BULLET_HITBOX_X      = 3
-BULLET_HITBOX_Y      = 1
-BULLET_HITBOX_WIDTH  = 8
-BULLET_HITBOX_HEIGHT = 8
-
     .rsset $0000
 joypad1_state       .rs 1
-bullet_active       .rs 1
-temp_x              .rs 1
-temp_y              .rs 1
-enemy_info          .rs 4 * NUM_ENEMIES
 
     .rsset $0200
 sprite_player       .rs 4
-sprite_bullet       .rs 4
-sprite_enemy        .rs 4 * NUM_ENEMIES
 
     .rsset $0000
 SPRITE_Y            .rs 1
 SPRITE_TILE         .rs 1
 SPRITE_ATTRIB       .rs 1
 SPRITE_X            .rs 1
-
-    .rsset $0000
-ENEMY_SPEED         .rs 1
-ENEMY_ALIVE         .rs 1
-
 
     .bank 0
     .org $C000
@@ -182,44 +158,8 @@ InitialiseGame: ; begin subroutine
     LDA #128     ; X position
     STA sprite_player + SPRITE_X    
 
-    ; Initialise enemies
-    LDX #0
-    LDA #ENEMY_SQUAD_HEIGHT * ENEMY_SPACING
-    STA temp_y
-InitEnemies_LoopY:
-    LDA #ENEMY_SQUAD_WIDTH * ENEMY_SPACING
-    STA temp_x
-InitEnemies_LoopX:
-    ; Accumulator = temp_x here
-    STA sprite_enemy + SPRITE_X, x 
-    LDA temp_y
-    STA sprite_enemy+SPRITE_Y, x 
-    LDA #3
-    STA sprite_enemy+SPRITE_TILE, x 
-    LDA #0
-    STA sprite_enemy+SPRITE_ATTRIB, x
-    LDA #1
-    STA enemy_info+ENEMY_SPEED, x 
-    STA enemy_info+ENEMY_ALIVE, x 
-    ; Increment x by 4
-    INX
-    INX
-    INX
-    INX
-    ; loop check for x value
-    LDA temp_x
-    SEC
-    SBC #ENEMY_SPACING
-    STA temp_x
-    BNE InitEnemies_LoopX
-    ; loop check for y value
-    LDA temp_y
-    SEC
-    SBC #ENEMY_SPACING
-    STA temp_y
-    BNE InitEnemies_LoopY
-
     RTS ; End subroutine
+
 ; --------------------------------------------------------------------------
 
 ; NMI is called on every frame
@@ -280,131 +220,6 @@ ReadLeft_Done:
     ADC #1
     STA sprite_player + SPRITE_X
 ReadRight_Done:
-
-    ; React to A button
-    LDA joypad1_state
-    AND #BUTTON_A
-    BEQ ReadA_Done  
-    ; Spawn a bullet if one is not active
-    LDA bullet_active
-    BNE ReadA_Done
-    ; no bullet active, so spawn one
-    LDA #1
-    STA bullet_active
-    LDA sprite_player + SPRITE_Y    ; Y position
-    STA sprite_bullet+ SPRITE_Y
-    LDA #16                         ; Tile number
-    STA sprite_bullet + SPRITE_TILE
-    LDA #0                          ; Attributes
-    STA sprite_bullet + SPRITE_ATTRIB
-    LDA sprite_player + SPRITE_X    ; X position
-    STA sprite_bullet + SPRITE_X    
-ReadA_Done:
-
-    ; Update the bullet
-    LDA bullet_active
-    BEQ UpdateBullet_Done
-    LDA sprite_bullet + SPRITE_Y
-    SEC 
-    SBC #1
-    STA sprite_bullet + SPRITE_Y
-    BCS UpdateBullet_Done
-    ; if carry play is clear, bullet has left the top of the screen - destroy it
-    LDA #0
-    sta bullet_active
-UpdateBullet_Done:
-
-    ; Update enemies
-    LDX #(NUM_ENEMIES-1)*4
-UpdateEnemies_Loop:
-    ; Check if enemy is alive
-    LDA enemy_info+ENEMY_ALIVE, x 
-    BNE UpdateEnemies_Start
-    JMP UpdateEnemies_Next
-UpdateEnemies_Start:
-    LDA sprite_enemy+SPRITE_X, x 
-    CLC
-    ADC enemy_info+ENEMY_SPEED, x 
-    STA sprite_enemy+SPRITE_X, x 
-    CMP #256 - ENEMY_SPACING
-    BCS UpdateEnemies_Reverse
-    CMP #ENEMY_SPACING
-    BCC UpdateEnemies_Reverse
-    JMP UpdateEnemies_NoReverse
-UpdateEnemies_Reverse:
-    ; Reverse direction and descend
-    LDA #0
-    SEC
-    SBC enemy_info+ENEMY_SPEED, x 
-    STA enemy_info+ENEMY_SPEED, x 
-    LDA sprite_enemy+SPRITE_Y, x 
-    CLC
-    ADC #ENEMY_DESCENT_SPEED
-    STA sprite_enemy+SPRITE_Y, x
-    LDA sprite_enemy+SPRITE_ATTRIB, x 
-    EOR #%01000000
-    STA sprite_enemy+SPRITE_ATTRIB, x 
-UpdateEnemies_NoReverse:
-
-                               ;              \1         \2         \3             \4              \5           \6           \7
-CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, object_hit_y, object_hit_w, object_hit_h, no_collision_label
-    ; if there is a collision, execution continues immediately after this macro
-    ; Else jump to no_collsion_label
-    LDA sprite_enemy+SPRITE_X, x  ; Calculate x_enemy - width bullet (x1-w2)
-    .if \3 > 0
-    SEC 
-    SBC \3
-    .endif
-    SEC
-    SBC \5+1    ; Assume w2 = 8
-    CMP \1      ; Compare with x_bullet (x2)
-    BCS \7 ; Branch if x1-w2-1-BULLET_HITBOX_X => x2i.e. w1-w2 > x2
-    CLC
-    ADC \5+1+ENEMY_HITBOX_WIDTH  ; Calculate x_enemy + w_enemy (x1 + w1), assuming w1 = 8
-    CMP \1   ; Compare with x_bullet (x2)
-    BCC \7 ; Branching if x1+w1 < x2
-    LDA sprite_enemy+SPRITE_Y, x  ; Calculate y_enemy - height bullet (y1-h2)
-    .if \4 > 0
-    SEC 
-    SBC \4
-    .endif
-    SEC
-    SBC \6+1   ; Assume h2 = 8
-    CMP \2    ; Compare with y_bullet (y2)
-    BCS \7 ; Branch if y1-h2 >= y2
-    CLC
-    ADC \6+1+ENEMY_HITBOX_HEIGHT ; Calculate y_enemy + h_enemy (y1 + h1), assuming h1 = 8
-    CMP \2    ; Compare with y_bullet (y2)
-    BCC \7 ; Branching if y1+h1 < y2
-    .endm 
-
-    ; Check collision with bullet
-    CheckCollisionWithEnemy sprite_bullet+SPRITE_X, sprite_bullet+SPRITE_Y, #BULLET_HITBOX_X, #BULLET_HITBOX_Y, #BULLET_HITBOX_WIDTH, #BULLET_HITBOX_HEIGHT, UpdateEnemies_NoCollision
-    ; Handle collision
-    NOP
-    LDA #0                        ; Destroy the bullet and the enemy
-    STA bullet_active   
-    STA enemy_info+ENEMY_ALIVE, x       
-    LDA #$FF
-    STA sprite_bullet+SPRITE_Y    
-    STA sprite_enemy+SPRITE_Y, x
-UpdateEnemies_NoCollision:
-
-    ; Check collision with player
-    CheckCollisionWithEnemy sprite_player+SPRITE_X, sprite_player+SPRITE_Y, #0, #0, #8, #8, Updateenemies_NoCollisionWithPlayer
-    ; Handle collision
-    JSR InitialiseGame
-    JMP UpdateEnemies_End
-Updateenemies_NoCollisionWithPlayer:
-
-UpdateEnemies_Next:
-    DEX
-    DEX
-    DEX
-    DEX
-    BMI UpdateEnemies_End
-    JMP UpdateEnemies_Loop
-UpdateEnemies_End:
 
     ; Copy sprite data to the PPU
     LDA #0
