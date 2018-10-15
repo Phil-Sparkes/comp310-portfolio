@@ -190,7 +190,7 @@ InitialiseGame: ; begin subroutine
     ; Write sprite data for sprite 0
     LDA #120     ; Y position
     STA sprite_player + SPRITE_Y
-    LDA #0       ; Tile number
+    LDA #1       ; Tile number
     STA sprite_player + SPRITE_TILE
     LDA #0       ; Attributes
     STA sprite_player + SPRITE_ATTRIB
@@ -283,11 +283,6 @@ scroll_NoWrap:
     JSR GenerateColumn
 scroll_NoGenerate:
 
-    ; Set PPUCTRL register
-    LdA scroll_page
-    ORA #%10000000
-    STA PPUCTRL
-
     ; Initialise controller 1
     LDA #1
     STA JOYPAD1
@@ -350,6 +345,11 @@ ReadRight_Done:
     STA OAMADDR
     LDA #$02
     STA OAMDMA
+
+    ; Set PPUCTRL register
+    LDA scroll_page
+    ORA #%10000000
+    STA PPUCTRL
 
     RTI        ; Return from interrupt
 
@@ -472,7 +472,7 @@ GenerateColumn_ExistingPipe
 
 GenerateColumn_Empty:
     LDX #30         ; 30 rows
-    LDA #$03        ; Tile 3
+    LDA #$00        ; Tile 0
 GenerateColumn_Empty_Loop:
     STA PPUDATA
     DEX
