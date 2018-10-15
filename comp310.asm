@@ -139,7 +139,7 @@ InitialiseGame: ; begin subroutine
     LDA #$12
     STA seed
     LDA #$34
-    STA seed
+    STA seed+1
 
     ; Reset the PPU high/low latch
     LDA PPUSTATUS
