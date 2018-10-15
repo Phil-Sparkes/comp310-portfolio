@@ -35,6 +35,8 @@ scroll_page         .rs 1
 generate_x          .rs 1
 generate_counter    .rs 1
 generate_pipe_y     .rs 1
+player_speed        .rs 2   ; in subpixels/frame -- 16 bits
+player_position_sub .rs 1   ; in subpixels
 
     .rsset $0200
 sprite_player       .rs 4
@@ -50,6 +52,9 @@ PIPE_GAP               = 6
 PIPE_RANDOM_MASK       = 15
 PIPE_DISTANCE_FROM_TOP = 5
 
+GRAVITY                = 10               ; in subpixels/frame^2
+FLAP_SPEED             = -(1 * 256 + 128) ; in subpixels/frame
+SCREEN_BOTTOM_Y        = 224
 
     .bank 0
     .org $C000
@@ -300,45 +305,52 @@ ReadController:
     CPX #8
     BNE ReadController
 
- ; React to Up button
+    ; React to A button
     LDA joypad1_state
-    AND #BUTTON_UP
-    BEQ ReadUp_Done  
-    LDA sprite_player + SPRITE_Y
-    CLC
-    ADC #-1
-    STA sprite_player + SPRITE_Y
-ReadUp_Done:
+    AND #BUTTON_A
+    BEQ ReadA_Done  
+    ; Set player speed
+    LDA #Low(FLAP_SPEED)
+    STA player_speed
+    LDA #HIGH(FLAP_SPEED)
+    STA player_speed+1
+ReadA_Done:
 
-    ; React to Down button
-    LDA joypad1_state
-    AND #BUTTON_DOWN
-    BEQ ReadDown_Done  
-    LDA sprite_player + SPRITE_Y
+    ; Update player sprite
+    ; First, update speed
+    LDA player_speed   ; Low 8 bits
     CLC
-    ADC #1
-    STA sprite_player + SPRITE_Y
-ReadDown_Done:
+    ADC #LOW(GRAVITY)
+    STA player_speed
+    LDA player_speed+1
+    ADC #HIGH(GRAVITY) ; High 8 bits
+    STA player_speed+1 ; NB: *don't* clear the carry flag!
 
-    ; React to Left button
-    LDA joypad1_state
-    AND #BUTTON_LEFT
-    BEQ ReadLeft_Done 
-    LDA sprite_player + SPRITE_X
+    ; Second, udpate position
+    LDA player_position_sub    ; Low 8 bits
     CLC
-    ADC #-1
-    STA sprite_player + SPRITE_X
-ReadLeft_Done:
+    ADC player_speed
+    STA player_position_sub
+    LDA sprite_player+SPRITE_Y ; High 8 bits
+    ADC player_speed+1         ;NB: *don't* clear the carry flag!
+    STA sprite_player+SPRITE_Y
 
-    ; React to Right button
-    LDA joypad1_state
-    AND #BUTTON_RIGHT
-    BEQ ReadRight_Done  
-    LDA sprite_player + SPRITE_X
-    CLC
-    ADC #1
-    STA sprite_player + SPRITE_X
-ReadRight_Done:
+    ; Check for top or bottom of screen
+    CMP #SCREEN_BOTTOM_Y     ; Accumulator already contains player y position
+    BCC UpdatePlayer_NoClamp
+    ; Check sign of speed
+    LDA player_speed+1
+    BMI UpdatePlayer_ClampToTop
+    LDA #SCREEN_BOTTOM_Y-1   ; Clamp to bottom
+    JMP UpdatePlayer_DoClamping
+UpdatePlayer_ClampToTop:
+    LDA #0                   ; Clamp to top
+UpdatePlayer_DoClamping:
+    STA sprite_player+SPRITE_Y
+    LDA #0                   ; Set player speed to zero
+    STA player_speed         ; (both bytes)
+    STA player_speed+1
+UpdatePlayer_NoClamp:
 
     ; Copy sprite data to the PPU
     LDA #0
