@@ -39,6 +39,7 @@ nametable_address   .rs 2
 player_speed        .rs 2   ; in subpixels/frame -- 16 bits
 player_position_sub .rs 1   ; in subpixels
 ball_speed          .rs 2   ; in subpixels/frame -- 16 bits
+ball_speed_x        .rs 2   ; in subpixels/frame -- 16 bits
 ball_position_sub   .rs 1   ; in subpixels
 
     .rsset $0200
@@ -52,7 +53,7 @@ SPRITE_ATTRIB       .rs 1
 SPRITE_X            .rs 1
 
 GRAVITY                = 10               ; in subpixels/frame^2
-JUMP_SPEED             = -(1 * 256 + 128) ; in subpixels/frame
+JUMP_SPEED             = -(0 * 256 + 196) ; in subpixels/frame
 SCREEN_BOTTOM_Y        = 160
 
     .bank 0
@@ -388,7 +389,7 @@ UpdatePlayer_DoClamping:
     STA player_speed+1
 UpdatePlayer_NoClamp:
 
-  ; Update ball sprite
+    ; Update ball sprite
     ; First, update speed
     LDA ball_speed   ; Low 8 bits
     CLC
@@ -420,36 +421,65 @@ Updateball_ClampToTop:
 Updateball_DoClamping:
     STA sprite_ball+SPRITE_Y
     LDA #0                   ; Set ball speed to zero
-    STA ball_speed         ; (both bytes)
+    STA ball_speed           ; (both bytes)
     STA ball_speed+1
 Updateball_NoClamp:
 
 ; Check collision with ball
-    LDA sprite_player+SPRITE_X, x  ; Calculate x_player - width ball (x1-w2)
+    LDA sprite_player+SPRITE_X   ; Calculate x_player - width ball (x1-w2)
     SEC 
-    SBC #8      ; Assume w2 = 8
-    CMP sprite_ball+SPRITE_X      ; Compare with x_ball (x2)
-    BCS UpdateEnemies_NoCollision ; Branch if x1-w2-1-ball_HITBOX_X => x2 i.e. w1-w2 > x2               IT'S DOING THIS
+    SBC #8                           ; Assume w2 = 8
+    CMP sprite_ball+SPRITE_X         ; Compare with x_ball (x2)
+    BCS UpdateBall_NoCollision       ; Branch if x1-w2-1-ball_HITBOX_X => x2 i.e. w1-w2 > x2               IT'S DOING THIS
     CLC
-    ADC #16  ; Calculate x_player + w_player (x1 + w1), assuming w1 = 8
-    CMP sprite_ball+SPRITE_X       ; Compare with x_ball (x2)
-    BCC UpdateEnemies_NoCollision  ; Branching if x1+w1 < x2
-    LDA sprite_player+SPRITE_Y, x  ; Calculate y_player - height ball (y1-h2)
-    SBC #8   ; Assume h2 = 8
-    CMP sprite_ball+SPRITE_Y    ; Compare with y_ball (y2)
-    BCS UpdateEnemies_NoCollision ; Branch if y1-h2 >= y2
+    ADC #16                          ; Calculate x_player + w_player (x1 + w1), assuming w1 = 8
+    CMP sprite_ball+SPRITE_X         ; Compare with x_ball (x2)
+    BCC UpdateBall_NoCollision       ; Branching if x1+w1 < x2
+    LDA sprite_player+SPRITE_Y    ; Calculate y_player - height ball (y1-h2)
+    SBC #8                           ; Assume h2 = 8
+    CMP sprite_ball+SPRITE_Y         ; Compare with y_ball (y2)
+    BCS UpdateBall_NoCollision       ; Branch if y1-h2 >= y2
     CLC
-    ADC #16 ; Calculate y_player + h_player (y1 + h1), assuming h1 = 8
-    CMP sprite_ball+SPRITE_Y    ; Compare with y_ball (y2)
-    BCC UpdateEnemies_NoCollision ; Branching if y1+h1 < y2
+    ADC #16                          ; Calculate y_player + h_player (y1 + h1), assuming h1 = 8
+    CMP sprite_ball+SPRITE_Y         ; Compare with y_ball (y2)
+    BCC UpdateBall_NoCollision       ; Branching if y1+h1 < y2
     ; Handle collision
     NOP    
-    LDA #$FF ; Destroy the ball and the player
-    STA sprite_ball+SPRITE_Y    
-    STA sprite_player+SPRITE_Y, x
-UpdateEnemies_NoCollision:
+    LDA sprite_ball+SPRITE_X         ; get ball position
+    SEC 
+    SBC sprite_player+SPRITE_X       ; subtract player position
+    STA ball_speed_x                 ; set speed as result
 
+    BPL UpdateBall_CollisionRight    ; collision from right
+    BMI UpdateBall_NoCollision       ; collision from left
+    NOP  
+UpdateBall_CollisionRight:
+    SEC
+    SBC #1
+UpdateBall_NoCollision: 
 
+    ; Update player sprite
+    ; First, update speed
+    LDA ball_speed_x  ; Low 8 bits
+    SEC
+    ;SBC #1
+    STA ball_speed_x
+    ;SBC #1
+    STA ball_speed_x+1 ; NB: *don't* clear the carry flag!
+
+    ; Second, udpate position
+    LDA player_position_sub    ; Low 8 bits
+    CLC
+    ADC player_speed
+    STA player_position_sub
+    LDA sprite_player+SPRITE_Y ; High 8 bits
+    ADC player_speed+1         ;NB: *don't* clear the carry flag!
+    STA sprite_player+SPRITE_Y
+
+    LDA ball_speed_x                 ; load speed
+    CLC
+    ADC sprite_ball+SPRITE_X         ; add speed to sprite
+    STA sprite_ball+SPRITE_X         ; save sprite location
 
     ; Copy sprite data to the PPU
     LDA #0
