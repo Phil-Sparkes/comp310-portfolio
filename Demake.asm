@@ -14,8 +14,8 @@ PPUSCROLL = $2005
 PPUADDR   = $2006
 PPUDATA   = $2007
 OAMDMA    = $4014
-JOYPAD1 = $4016
-JOYPAD2 = $4017
+JOYPAD1   = $4016
+JOYPAD2   = $4017
 
 BUTTON_A      = %10000000
 BUTTON_B      = %01000000
@@ -34,25 +34,36 @@ BALL_HITBOX_WIDTH    = 8
 BALL_HITBOX_HEIGHT   = 8
 
     .rsset $0000
-joypad1_state       .rs 1
-nametable_address   .rs 2
-player_speed        .rs 2   ; in subpixels/frame -- 16 bits
-player_position_sub .rs 1   ; in subpixels
-ball_speed          .rs 2   ; in subpixels/frame -- 16 bits
-ball_speed_x        .rs 2   ; in subpixels/frame -- 16 bits
-ball_position_sub   .rs 1   ; in subpixels
+joypad1_state        .rs 1
+joypad2_state        .rs 1
+nametable_address    .rs 2
+
+player1_speed        .rs 2   ; in subpixels/frame -- 16 bits
+player2_speed        .rs 2   ; in subpixels/frame -- 16 bits
+player1_position_sub .rs 1   ; in subpixels
+player2_position_sub .rs 1   ; in subpixels
+
+ball_speed_x         .rs 2   ; in subpixels/frame -- 16 bits
+ball_speed_y         .rs 2   ; in subpixels/frame -- 16 bits
+ball_position_sub_x  .rs 1   ; in subpixels
+ball_position_sub_y  .rs 1   ; in subpixels
 
     .rsset $0200
-sprite_player       .rs 4
-sprite_ball         .rs 4
+sprite_player1       .rs 4
+sprite_player2       .rs 4
+sprite_ball          .rs 4
+sprite_net1High      .rs 4
+sprite_net1Low       .rs 4
+sprite_net2High      .rs 4
+sprite_net2Low       .rs 4
 
     .rsset $0000
-SPRITE_Y            .rs 1
-SPRITE_TILE         .rs 1
-SPRITE_ATTRIB       .rs 1
-SPRITE_X            .rs 1
+SPRITE_Y             .rs 1
+SPRITE_TILE          .rs 1
+SPRITE_ATTRIB        .rs 1
+SPRITE_X             .rs 1
 
-GRAVITY                = 10               ; in subpixels/frame^2
+GRAVITY                = 9                ; in subpixels/frame^2
 JUMP_SPEED             = -(0 * 256 + 196) ; in subpixels/frame
 SCREEN_BOTTOM_Y        = 160
 
@@ -186,25 +197,75 @@ InitialiseGame: ; begin subroutine
     LDA #$06
     STA PPUDATA
 
-    ; Write sprite data for sprite 0
-    LDA #200     ; Y position
-    STA sprite_player + SPRITE_Y
+    ; Write sprite data for sprite 0 ([Player1])
+    LDA #100     ; Y position
+    STA sprite_player1 + SPRITE_Y
     LDA #1       ; Tile number
-    STA sprite_player + SPRITE_TILE
+    STA sprite_player1 + SPRITE_TILE
     LDA #0       ; Attributes
-    STA sprite_player + SPRITE_ATTRIB
+    STA sprite_player1 + SPRITE_ATTRIB
     LDA #30     ; X position
-    STA sprite_player + SPRITE_X    
+    STA sprite_player1 + SPRITE_X    
 
-    ; Write sprite data for sprite 1
+    ; Write sprite data for sprite 1 ([Player2])
+    LDA #100     ; Y position
+    STA sprite_player2 + SPRITE_Y
+    LDA #2       ; Tile number
+    STA sprite_player2 + SPRITE_TILE
+    LDA #0       ; Attributes
+    STA sprite_player2 + SPRITE_ATTRIB
+    LDA #230     ; X position
+    STA sprite_player2 + SPRITE_X    
+
+    ; Write sprite data for sprite 2 ([BALL])
     LDA #125     ; Y position
     STA sprite_ball + SPRITE_Y
-    LDA #2       ; Tile number
+    LDA #3       ; Tile number
     STA sprite_ball + SPRITE_TILE
     LDA #0       ; Attributes
     STA sprite_ball + SPRITE_ATTRIB
     LDA #128     ; X position
     STA sprite_ball + SPRITE_X    
+
+    ; Write sprite data for sprite 3 ([NET1High])
+    LDA #156       ; Y position
+    STA sprite_net1High + SPRITE_Y
+    LDA #$14       ; Tile number
+    STA sprite_net1High + SPRITE_TILE
+    LDA #0         ; Attributes
+    STA sprite_net1High + SPRITE_ATTRIB
+    LDA #9         ; X position
+    STA sprite_net1High + SPRITE_X    
+
+    ; Write sprite data for sprite 4 ([NET1Low])
+    LDA #164      ; Y position
+    STA sprite_net1Low + SPRITE_Y
+    LDA #$24       ; Tile number
+    STA sprite_net1Low + SPRITE_TILE
+    LDA #0        ; Attributes
+    STA sprite_net1Low + SPRITE_ATTRIB
+    LDA #9      ; X position
+    STA sprite_net1Low + SPRITE_X    
+
+    ; Write sprite data for sprite 3 ([NET2High])
+    LDA #156       ; Y position
+    STA sprite_net2High + SPRITE_Y
+    LDA #$15       ; Tile number
+    STA sprite_net2High + SPRITE_TILE
+    LDA #0         ; Attributes
+    STA sprite_net2High + SPRITE_ATTRIB
+    LDA #247         ; X position
+    STA sprite_net2High + SPRITE_X    
+
+    ; Write sprite data for sprite 4 ([NET2Low])
+    LDA #164      ; Y position
+    STA sprite_net2Low + SPRITE_Y
+    LDA #$25       ; Tile number
+    STA sprite_net2Low + SPRITE_TILE
+    LDA #0        ; Attributes
+    STA sprite_net2Low + SPRITE_ATTRIB
+    LDA #247      ; X position
+    STA sprite_net2Low + SPRITE_X   
 
     ; Load nametable data
     LDA #$20             ; Write address $2000 to PPUADDR register
@@ -294,6 +355,7 @@ NMI:
     ; Read joypad state
     LDX #0
     STX joypad1_state
+
 ReadController:
     LDA JOYPAD1
     LSR A
@@ -306,40 +368,40 @@ ReadController:
     LDA joypad1_state
     AND #BUTTON_UP
     BEQ ReadUp_Done  
-    LDA sprite_player + SPRITE_Y
+    LDA sprite_player1 + SPRITE_Y
     CLC
     ADC #-1
-    STA sprite_player + SPRITE_Y
+    STA sprite_player1 + SPRITE_Y
 ReadUp_Done:
 
     ; React to Down button
     LDA joypad1_state
     AND #BUTTON_DOWN
     BEQ ReadDown_Done  
-    LDA sprite_player + SPRITE_Y
+    LDA sprite_player1 + SPRITE_Y
     CLC
     ADC #1
-    STA sprite_player + SPRITE_Y
+    STA sprite_player1 + SPRITE_Y
 ReadDown_Done:
 
     ; React to Left button
     LDA joypad1_state
     AND #BUTTON_LEFT
     BEQ ReadLeft_Done 
-    LDA sprite_player + SPRITE_X
+    LDA sprite_player1 + SPRITE_X
     CLC
     ADC #-1
-    STA sprite_player + SPRITE_X
+    STA sprite_player1 + SPRITE_X
 ReadLeft_Done:
 
     ; React to Right button
     LDA joypad1_state
     AND #BUTTON_RIGHT
     BEQ ReadRight_Done  
-    LDA sprite_player + SPRITE_X
+    LDA sprite_player1 + SPRITE_X
     CLC
     ADC #1
-    STA sprite_player + SPRITE_X
+    STA sprite_player1 + SPRITE_X
 ReadRight_Done:
 
  ; React to A button
@@ -348,138 +410,255 @@ ReadRight_Done:
     BEQ ReadA_Done  
     ; Set player speed
     LDA #Low(JUMP_SPEED)
-    STA player_speed
+    STA player1_speed
     LDA #HIGH(JUMP_SPEED)
-    STA player_speed+1
+    STA player1_speed+1
 ReadA_Done:
+
+    ; Initialise controller 2
+    LDA #1
+    STA JOYPAD2
+    LDA #0
+    STA JOYPAD2
+
+    ; Read joypad state
+    LDX #0
+    STX joypad2_state
+
+; second controller
+ReadController2:
+    LDA JOYPAD2
+    LSR A
+    ROL joypad2_state
+    INX
+    CPX #8
+    BNE ReadController2
+
+ ; React to Up button
+    LDA joypad2_state
+    AND #BUTTON_UP
+    BEQ ReadUp2_Done  
+    LDA sprite_player2 + SPRITE_Y
+    CLC
+    ADC #-1
+    STA sprite_player2 + SPRITE_Y
+ReadUp2_Done:
+
+    ; React to Down button
+    LDA joypad2_state
+    AND #BUTTON_DOWN
+    BEQ ReadDown2_Done  
+    LDA sprite_player2 + SPRITE_Y
+    CLC
+    ADC #1
+    STA sprite_player2 + SPRITE_Y
+ReadDown2_Done:
+
+    ; React to Left button
+    LDA joypad2_state
+    AND #BUTTON_LEFT
+    BEQ ReadLeft2_Done 
+    LDA sprite_player2 + SPRITE_X
+    CLC
+    ADC #-1
+    STA sprite_player2 + SPRITE_X
+ReadLeft2_Done:
+
+    ; React to Right button
+    LDA joypad2_state
+    AND #BUTTON_RIGHT
+    BEQ ReadRight2_Done  
+    LDA sprite_player2 + SPRITE_X
+    CLC
+    ADC #1
+    STA sprite_player2 + SPRITE_X
+ReadRight2_Done:
+
+ ; React to A button
+    LDA joypad2_state
+    AND #BUTTON_A
+    BEQ ReadA2_Done  
+    ; Set player speed
+    LDA #Low(JUMP_SPEED)
+    STA player2_speed
+    LDA #HIGH(JUMP_SPEED)
+    STA player2_speed+1
+ReadA2_Done:
 
     ; Update player sprite
     ; First, update speed
-    LDA player_speed   ; Low 8 bits
+    LDA player1_speed   ; Low 8 bits
     CLC
     ADC #LOW(GRAVITY)
-    STA player_speed
-    LDA player_speed+1
+    STA player1_speed
+    LDA player1_speed+1
     ADC #HIGH(GRAVITY) ; High 8 bits
-    STA player_speed+1 ; NB: *don't* clear the carry flag!
+    STA player1_speed+1 ; NB: *don't* clear the carry flag!
 
     ; Second, udpate position
-    LDA player_position_sub    ; Low 8 bits
+    LDA player1_position_sub    ; Low 8 bits
     CLC
-    ADC player_speed
-    STA player_position_sub
-    LDA sprite_player+SPRITE_Y ; High 8 bits
-    ADC player_speed+1         ;NB: *don't* clear the carry flag!
-    STA sprite_player+SPRITE_Y
+    ADC player1_speed
+    STA player1_position_sub
+    LDA sprite_player1+SPRITE_Y ; High 8 bits
+    ADC player1_speed+1         ;NB: *don't* clear the carry flag!
+    STA sprite_player1+SPRITE_Y
 
     ; Check for top or bottom of screen
     CMP #SCREEN_BOTTOM_Y     ; Accumulator already contains player y position
     BCC UpdatePlayer_NoClamp
     ; Check sign of speed
-    LDA player_speed+1
+    LDA player1_speed+1
     BMI UpdatePlayer_ClampToTop
     LDA #SCREEN_BOTTOM_Y-1   ; Clamp to bottom
     JMP UpdatePlayer_DoClamping
 UpdatePlayer_ClampToTop:
     LDA #0                   ; Clamp to top
 UpdatePlayer_DoClamping:
-    STA sprite_player+SPRITE_Y
+    STA sprite_player1+SPRITE_Y
     LDA #0                   ; Set player speed to zero
-    STA player_speed         ; (both bytes)
-    STA player_speed+1
+    STA player1_speed         ; (both bytes)
+    STA player1_speed+1
 UpdatePlayer_NoClamp:
+    ; Update player sprite
+    ; First, update speed
+    LDA player2_speed   ; Low 8 bits
+    CLC
+    ADC #LOW(GRAVITY)
+    STA player2_speed
+    LDA player2_speed+1
+    ADC #HIGH(GRAVITY) ; High 8 bits
+    STA player2_speed+1 ; NB: *don't* clear the carry flag!
+
+    ; Second, udpate position
+    LDA player2_position_sub    ; Low 8 bits
+    CLC
+    ADC player2_speed
+    STA player2_position_sub
+    LDA sprite_player2+SPRITE_Y ; High 8 bits
+    ADC player2_speed+1         ;NB: *don't* clear the carry flag!
+    STA sprite_player2+SPRITE_Y
+
+    ; Check for top or bottom of screen
+    CMP #SCREEN_BOTTOM_Y     ; Accumulator already contains player y position
+    BCC UpdatePlayer2_NoClamp
+    ; Check sign of speed
+    LDA player2_speed+1
+    BMI UpdatePlayer2_ClampToTop
+    LDA #SCREEN_BOTTOM_Y-1   ; Clamp to bottom
+    JMP UpdatePlayer2_DoClamping
+UpdatePlayer2_ClampToTop:
+    LDA #0                   ; Clamp to top
+UpdatePlayer2_DoClamping:
+    STA sprite_player2+SPRITE_Y
+    LDA #0                   ; Set player speed to zero
+    STA player2_speed         ; (both bytes)
+    STA player2_speed+1
+UpdatePlayer2_NoClamp:
 
     ; Update ball sprite
     ; First, update speed
-    LDA ball_speed   ; Low 8 bits
+    LDA ball_speed_y   ; Low 8 bits
     CLC
     ADC #LOW(GRAVITY)
-    STA ball_speed
-    LDA ball_speed+1
+    STA ball_speed_y
+    LDA ball_speed_y+1
     ADC #HIGH(GRAVITY) ; High 8 bits
-    STA ball_speed+1 ; NB: *don't* clear the carry flag!
+    STA ball_speed_y+1 ; NB: *don't* clear the carry flag!
 
     ; Second, udpate position
-    LDA ball_position_sub    ; Low 8 bits
+    LDA ball_position_sub_y    ; Low 8 bits
     CLC
-    ADC ball_speed
-    STA ball_position_sub
+    ADC ball_speed_y
+    STA ball_position_sub_y
     LDA sprite_ball+SPRITE_Y ; High 8 bits
-    ADC ball_speed+1         ;NB: *don't* clear the carry flag!
+    ADC ball_speed_y+1         ;NB: *don't* clear the carry flag!
     STA sprite_ball+SPRITE_Y
 
     ; Check for top or bottom of screen
     CMP #SCREEN_BOTTOM_Y     ; Accumulator already contains ball y position
-    BCC Updateball_NoClamp
+    BCC Updateball_NoClampY
     ; Check sign of speed
-    LDA ball_speed+1
+    LDA ball_speed_y+1
     BMI Updateball_ClampToTop
     LDA #SCREEN_BOTTOM_Y-1   ; Clamp to bottom
-    JMP Updateball_DoClamping
+    JMP Updateball_DoClampingY
 Updateball_ClampToTop:
     LDA #0                   ; Clamp to top
-Updateball_DoClamping:
+Updateball_DoClampingY:
     STA sprite_ball+SPRITE_Y
-    LDA #0                   ; Set ball speed to zero
-    STA ball_speed           ; (both bytes)
-    STA ball_speed+1
-Updateball_NoClamp:
-
-; Check collision with ball
-    LDA sprite_player+SPRITE_X   ; Calculate x_player - width ball (x1-w2)
-    SEC 
-    SBC #8                           ; Assume w2 = 8
-    CMP sprite_ball+SPRITE_X         ; Compare with x_ball (x2)
-    BCS UpdateBall_NoCollision       ; Branch if x1-w2-1-ball_HITBOX_X => x2 i.e. w1-w2 > x2               IT'S DOING THIS
-    CLC
-    ADC #16                          ; Calculate x_player + w_player (x1 + w1), assuming w1 = 8
-    CMP sprite_ball+SPRITE_X         ; Compare with x_ball (x2)
-    BCC UpdateBall_NoCollision       ; Branching if x1+w1 < x2
-    LDA sprite_player+SPRITE_Y    ; Calculate y_player - height ball (y1-h2)
-    SBC #8                           ; Assume h2 = 8
-    CMP sprite_ball+SPRITE_Y         ; Compare with y_ball (y2)
-    BCS UpdateBall_NoCollision       ; Branch if y1-h2 >= y2
-    CLC
-    ADC #16                          ; Calculate y_player + h_player (y1 + h1), assuming h1 = 8
-    CMP sprite_ball+SPRITE_Y         ; Compare with y_ball (y2)
-    BCC UpdateBall_NoCollision       ; Branching if y1+h1 < y2
-    ; Handle collision
-    NOP    
-    LDA sprite_ball+SPRITE_X         ; get ball position
-    SEC 
-    SBC sprite_player+SPRITE_X       ; subtract player position
-    STA ball_speed_x                 ; set speed as result
-
-    BPL UpdateBall_CollisionRight    ; collision from right
-    BMI UpdateBall_NoCollision       ; collision from left
-    NOP  
-UpdateBall_CollisionRight:
+    LDA #0
     SEC
-    SBC #1
-UpdateBall_NoCollision: 
-
-    ; Update player sprite
-    ; First, update speed
-    LDA ball_speed_x  ; Low 8 bits
+    SBC ball_speed_y 
+    STA ball_speed_y  
+    LDA #0
     SEC
-    ;SBC #1
-    STA ball_speed_x
-    ;SBC #1
-    STA ball_speed_x+1 ; NB: *don't* clear the carry flag!
-
-    ; Second, udpate position
-    LDA player_position_sub    ; Low 8 bits
-    CLC
-    ADC player_speed
-    STA player_position_sub
-    LDA sprite_player+SPRITE_Y ; High 8 bits
-    ADC player_speed+1         ;NB: *don't* clear the carry flag!
-    STA sprite_player+SPRITE_Y
+    SBC ball_speed_y+1         
+    STA ball_speed_y+1
+Updateball_NoClampY:
 
     LDA ball_speed_x                 ; load speed
     CLC
     ADC sprite_ball+SPRITE_X         ; add speed to sprite
     STA sprite_ball+SPRITE_X         ; save sprite location
+
+  ; Check for side of screen
+    CMP #0     ; Accumulator already contains ball y position
+    BNE Updateball_NoClampX
+    JMP Updateball_DoClampingX                ; Clamp to top
+Updateball_DoClampingX:
+    LDA sprite_ball+SPRITE_Y
+    CMP #158
+    BPL Updateball_Score
+    LDA #0
+    SEC
+    SBC ball_speed_x
+    STA ball_speed_x        
+    JMP Updateball_NoClampX 
+Updateball_Score:
+    LDA #0
+    ball_speed_x
+Updateball_NoClampX:
+
+
+                              ;             \1        \2        \3                     
+CheckCollisionWithBall .macro ; parameters: player_x, player_y, no_collision_label
+; Check collision with ball
+    LDA \1 ;sprite_player1+SPRITE_X      ; Calculate x_player - width ball (x1-w2)
+    SEC 
+    SBC #8                           ; Assume w2 = 8
+    CMP sprite_ball+SPRITE_X         ; Compare with x_ball (x2)
+    BCS \3 ;UpdateBall_NoCollision       ; Branch if x1-w2-1-ball_HITBOX_X => x2 i.e. w1-w2 > x2            
+    CLC
+    ADC #16                          ; Calculate x_player + w_player (x1 + w1), assuming w1 = 8
+    CMP sprite_ball+SPRITE_X         ; Compare with x_ball (x2)
+    BCC \3 ;UpdateBall_NoCollision       ; Branching if x1+w1 < x2
+    LDA \2 ;sprite_player1+SPRITE_Y       ; Calculate y_player - height ball (y1-h2)
+    SBC #8                           ; Assume h2 = 8
+    CMP sprite_ball+SPRITE_Y         ; Compare with y_ball (y2)
+    BCS \3 ;UpdateBall_NoCollision       ; Branch if y1-h2 >= y2
+    CLC
+    ADC #16                          ; Calculate y_player + h_player (y1 + h1), assuming h1 = 8
+    CMP sprite_ball+SPRITE_Y         ; Compare with y_ball (y2)
+    BCC \3 ;UpdateBall_NoCollisio22n       ; Branching if y1+h1 < y2
+    
+    ; Handle collision
+    LDA #254
+    STA ball_speed_y+1
+    ;LDA #254                          
+    STA ball_speed_x                 ; set speed
+    LDA sprite_ball+SPRITE_X         ; get ball position
+    CMP \1 ;sprite_player1+SPRITE_X
+    BMI \3 ;UpdateBall_CollisionRight    ; collision from right
+
+    LDA #02                          ; subtract player position
+    STA ball_speed_x                 ; set speed as result
+    .endm    
+
+    CheckCollisionWithBall sprite_player1+SPRITE_X, sprite_player1+SPRITE_Y, UpdateBall_NoCollision 
+UpdateBall_NoCollision: 
+   CheckCollisionWithBall sprite_player2+SPRITE_X, sprite_player2+SPRITE_Y, UpdateBall_NoCollision2 
+UpdateBall_NoCollision2: 
 
     ; Copy sprite data to the PPU
     LDA #0
@@ -491,36 +670,36 @@ UpdateBall_NoCollision:
 
 ; --------------------------------------------------------------------------
 NametableData:
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11,$11
-    .db $10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10
-    .db $10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10
-    .db $10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10
-    .db $10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10
-    .db $10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05,$05
+    .db $30,$30,$32,$32,$32,$32,$32,$32,$32,$32,$32,$32,$32,$32,$32,$32,$31,$32,$32,$32,$32,$32,$32,$32,$32,$32,$32,$32,$32,$32,$32,$33
+    .db $40,$60,$61,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$41,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$62,$63
+    .db $40,$40,$43,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$10,$11,$12,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$40,$43
+    .db $40,$40,$43,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$20,$21,$22,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$40,$43
+    .db $40,$70,$71,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$41,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$42,$72,$73
+    .db $50,$50,$52,$52,$52,$52,$52,$52,$52,$52,$52,$52,$52,$52,$52,$52,$51,$52,$52,$52,$52,$52,$52,$52,$52,$52,$52,$52,$52,$52,$52,$53
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+    .db $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
     .db $00  ; null terminator
 ; --------------------------------------------------------------------------
 
