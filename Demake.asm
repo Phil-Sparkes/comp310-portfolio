@@ -65,15 +65,15 @@ sprite_player1       .rs 4
 sprite_player2       .rs 4
 sprite_ball          .rs 4
 
-sprite_net1      .rs 8
+sprite_net1          .rs 8
 sprite_net1Low       .rs 4
-sprite_net2      .rs 8
+sprite_net2          .rs 8
 sprite_net2Low       .rs 4
 
 sprite_player1Score  .rs 4
 sprite_player2Score  .rs 4
 
-sprite_cloud     .rs 8
+sprite_cloud         .rs 8
 sprite_cloudRight    .rs 4
 
     .rsset $0000
