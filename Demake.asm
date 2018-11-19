@@ -65,15 +65,15 @@ sprite_player1       .rs 4
 sprite_player2       .rs 4
 sprite_ball          .rs 4
 
-sprite_net1High      .rs 4
+sprite_net1      .rs 8
 sprite_net1Low       .rs 4
-sprite_net2High      .rs 4
+sprite_net2      .rs 8
 sprite_net2Low       .rs 4
 
 sprite_player1Score  .rs 4
 sprite_player2Score  .rs 4
 
-sprite_cloudLeft     .rs 4
+sprite_cloud     .rs 8
 sprite_cloudRight    .rs 4
 
     .rsset $0000
@@ -81,6 +81,10 @@ SPRITE_Y             .rs 1
 SPRITE_TILE          .rs 1
 SPRITE_ATTRIB        .rs 1
 SPRITE_X             .rs 1
+SPRITE2_Y            .rs 1
+SPRITE2_TILE         .rs 1
+SPRITE2_ATTRIB       .rs 1
+SPRITE2_X            .rs 1
 
 GRAVITY                = 9                ; in subpixels/frame^2
 JUMP_SPEED             = -(0 * 256 + 196) ; in subpixels/frame
@@ -199,7 +203,7 @@ InitialiseGame: ; begin subroutine
     LDA #$0F
     STA PPUDATA
 
-    ; Write the palette colours  (Palette1)
+    ; Write the palette colours  ([Palette1])
     LDA #$06
     STA PPUDATA
     LDA #$21
@@ -211,7 +215,7 @@ InitialiseGame: ; begin subroutine
     LDA #$0F
     STA PPUDATA
 
-    ; Write the palette colours  (Palette2)
+    ; Write the palette colours  ([Palette2])
     LDA #$01
     STA PPUDATA
     LDA #$21
@@ -223,7 +227,7 @@ InitialiseGame: ; begin subroutine
     LDA #$0F
     STA PPUDATA
 
-    ; Write the palette colours  (Palette3)
+    ; Write the palette colours  ([Palette3])
     LDA #$30
     STA PPUDATA
     LDA #$2D
@@ -251,7 +255,7 @@ InitialiseGame: ; begin subroutine
     LDA #PLAYER2_SPAWN_X ; X position
     STA sprite_player2 + SPRITE_X    
 
-    ; Write sprite data for sprite 2 ([BALL])
+    ; Write sprite data for sprite 2 ([Ball])
     LDA #BALL_SPAWN_Y    ; Y position
     STA sprite_ball + SPRITE_Y
     LDA #2               ; Tile number
@@ -261,47 +265,7 @@ InitialiseGame: ; begin subroutine
     LDA #BALL_SPAWN_X    ; X position
     STA sprite_ball + SPRITE_X    
 
-    ; Write sprite data for sprite 3 ([NET1High])
-    LDA #156             ; Y position
-    STA sprite_net1High + SPRITE_Y
-    LDA #$13             ; Tile number
-    STA sprite_net1High + SPRITE_TILE
-    LDA #0               ; Attributes
-    STA sprite_net1High + SPRITE_ATTRIB
-    LDA #9               ; X position
-    STA sprite_net1High + SPRITE_X    
-
-    ; Write sprite data for sprite 4 ([NET1Low])
-    LDA #164             ; Y position
-    STA sprite_net1Low + SPRITE_Y
-    LDA #$23             ; Tile number
-    STA sprite_net1Low + SPRITE_TILE
-    LDA #0               ; Attributes
-    STA sprite_net1Low + SPRITE_ATTRIB
-    LDA #9               ; X position
-    STA sprite_net1Low + SPRITE_X    
-
-    ; Write sprite data for sprite 3 ([NET2High])
-    LDA #156             ; Y position
-    STA sprite_net2High + SPRITE_Y
-    LDA #$13             ; Tile number
-    STA sprite_net2High + SPRITE_TILE
-    LDA #65              ; Attributes
-    STA sprite_net2High + SPRITE_ATTRIB
-    LDA #247             ; X position
-    STA sprite_net2High + SPRITE_X    
-
-    ; Write sprite data for sprite 4 ([NET2Low])
-    LDA #164             ; Y position
-    STA sprite_net2Low + SPRITE_Y
-    LDA #$23             ; Tile number
-    STA sprite_net2Low + SPRITE_TILE
-    LDA #65              ; Attributes
-    STA sprite_net2Low + SPRITE_ATTRIB
-    LDA #247             ; X position
-    STA sprite_net2Low + SPRITE_X   
-
-    ; Write sprite data for sprite 5 ([Player1Score])
+    ; Write sprite data for sprite 3 ([Player1Score])
     LDA #32              ; Y position
     STA sprite_player1Score + SPRITE_Y
     LDA #$80             ; Tile number
@@ -311,7 +275,7 @@ InitialiseGame: ; begin subroutine
     LDA #8               ; X position
     STA sprite_player1Score + SPRITE_X   
 
-    ; Write sprite data for sprite 6 ([Player2Score])
+    ; Write sprite data for sprite 4 ([Player2Score])
     LDA #32              ; Y position
     STA sprite_player2Score + SPRITE_Y
     LDA #$80             ; Tile number
@@ -321,25 +285,53 @@ InitialiseGame: ; begin subroutine
     LDA #248             ; X position
     STA sprite_player2Score + SPRITE_X   
 
-    ; Write sprite data for sprite 7 ([CloudLeft])
-    LDA #80              ; Y position
-    STA sprite_cloudLeft + SPRITE_Y
-    LDA #$05             ; Tile number
-    STA sprite_cloudLeft + SPRITE_TILE
-    LDA #2               ; Attributes
-    STA sprite_cloudLeft + SPRITE_ATTRIB
-    LDA #120             ; X position
-    STA sprite_cloudLeft + SPRITE_X   
+    ; Write sprite data for sprites 5 and 6 ([Net1])
+    LDA #156             ; Y position
+    STA sprite_net1 + SPRITE_Y
+    LDA #164             
+    STA sprite_net1 + SPRITE2_Y
+    LDA #$13             ; Tile number
+    STA sprite_net1 + SPRITE_TILE
+    LDA #$23             
+    STA sprite_net1 + SPRITE2_TILE
+    LDA #0               ; Attributes
+    STA sprite_net1 + SPRITE_ATTRIB
+    STA sprite_net1 + SPRITE2_ATTRIB
+    LDA #9               ; X position
+    STA sprite_net1 + SPRITE_X    
+    STA sprite_net1 + SPRITE2_X 
 
-    ; Write sprite data for sprite 8 ([CloudRight])
+    ; Write sprite data for sprites 7 and 8 ([Net2])
+    LDA #156             ; Y position
+    STA sprite_net2 + SPRITE_Y
+    LDA #164             
+    STA sprite_net2 + SPRITE2_Y
+    LDA #$13             ; Tile number
+    STA sprite_net2 + SPRITE_TILE
+    LDA #$23             
+    STA sprite_net2 + SPRITE2_TILE
+    LDA #65              ; Attributes
+    STA sprite_net2 + SPRITE_ATTRIB
+    STA sprite_net2 + SPRITE2_ATTRIB
+    LDA #247             ; X position
+    STA sprite_net2 + SPRITE_X    
+    STA sprite_net2 + SPRITE2_X   
+
+    ; Write sprite data for sprites 9 and 10 ([Cloud])
     LDA #80              ; Y position
-    STA sprite_cloudRight + SPRITE_Y
-    LDA #$06             ; Tile number
-    STA sprite_cloudRight + SPRITE_TILE
+    STA sprite_cloud + SPRITE_Y
+    STA sprite_cloud + SPRITE2_Y
+    LDA #$05             ; Tile number
+    STA sprite_cloud + SPRITE_TILE
+    LDA #$06             
+    STA sprite_cloud + SPRITE2_TILE
     LDA #2               ; Attributes
-    STA sprite_cloudRight + SPRITE_ATTRIB
+    STA sprite_cloud + SPRITE_ATTRIB
+    STA sprite_cloud + SPRITE2_ATTRIB
+    LDA #120             ; X position
+    STA sprite_cloud + SPRITE_X     
     LDA #128             ; X position
-    STA sprite_cloudRight + SPRITE_X   
+    STA sprite_cloud + SPRITE2_X   
 
     ; Load nametable data
     LDA #$20             ; Write address $2000 to PPUADDR register
@@ -653,8 +645,7 @@ UpdatePlayer2_NoClamp:
     ; Check for top or bottom of screen
     CMP #SCREEN_BOTTOM_Y       ; Accumulator already contains ball y position
     BCC Updateball_NoClampY
-    ; Check sign of speed
-    LDA ball_speed_y+1
+    LDA ball_speed_y+1         ; Check sign of speed
     BMI Updateball_ClampToTop
     LDA #SCREEN_BOTTOM_Y-1     ; Clamp to bottom
     JMP Updateball_DoClampingY
@@ -662,7 +653,7 @@ Updateball_ClampToTop:
     LDA #0                     ; Clamp to top
 Updateball_DoClampingY:
     STA sprite_ball+SPRITE_Y
-    LDA #0
+    LDA #0                     ; invert ball y speed to simulate bounce off floor
     SEC
     SBC ball_speed_y 
     STA ball_speed_y  
@@ -682,46 +673,46 @@ Updateball_NoClampY:
     BNE Updateball_NoClampX
     JMP Updateball_DoClampingX  ; Clamp to top
 Updateball_DoClampingX:
-    LDA sprite_ball+SPRITE_Y
-    CMP #NET_HEIGHT 
-    BPL Update_Score
-    LDA #0
+    LDA sprite_ball+SPRITE_Y    ; Check ball height
+    CMP #NET_HEIGHT             ; Compare to net height
+    BPL Update_Score            ; Branching if ball in net
+    LDA #0                      ; invert ball x speed to simulate bounce off wall
     SEC
     SBC ball_speed_x
     STA ball_speed_x        
     JMP Updateball_NoClampX 
 Update_Score:
-    LDA ball_speed_x
+    LDA ball_speed_x            ; Check sign of speed
     CMP #0
-    BMI Update_Player2Score
+    BMI Update_Player2Score     ; Branching if ball going left
     LDA player1_score
     CLC
-    ADC #1
+    ADC #1                      ; Increment score
     STA player1_score
-    ADC #SPRITE_SCORE_START
+    ADC #SPRITE_SCORE_START     ; Set score tile
     STA sprite_player1Score+SPRITE_TILE
     JMP Update_Reset
 Update_Player2Score:
     LDA player2_score
     CLC
-    ADC #1
+    ADC #1                      ; Increment score
     STA player2_score
-    ADC #SPRITE_SCORE_START
+    ADC #SPRITE_SCORE_START     ; Set score tile
     STA sprite_player2Score+SPRITE_TILE
 Update_Reset:
     LDA #0
-    STA ball_speed_x
+    STA ball_speed_x            ; Reset ball speed
     STA ball_speed_x+1
     STA ball_speed_y
     STA ball_speed_y+1
-    STA player1_speed
+    STA player1_speed           ; Reset player speed
     STA player2_speed
-    LDA #BALL_SPAWN_Y
+    LDA #BALL_SPAWN_Y           ; Reset ball spawn
     STA sprite_ball+SPRITE_Y
     LDA #BALL_SPAWN_X
     STA sprite_ball+SPRITE_X
-    LDA #PLAYER_SPAWN_Y
-    STA sprite_player1 + SPRITE_Y
+    LDA #PLAYER_SPAWN_Y         ; Reset player spawns
+    STA sprite_player1 + SPRITE_Y     
     STA sprite_player2 + SPRITE_Y
     LDA #PLAYER1_SPAWN_X
     STA sprite_player1 + SPRITE_X
@@ -752,18 +743,18 @@ CheckCollisionWithBall .macro ; parameters: player_x, player_y, no_collision_lab
     BCC \3                                         ; Branching if y1+h1 < y2
     
     ; Handle collision
-    LDA sprite_ball+SPRITE_X                       ; get ball position
-    CMP \1               
-    BMI \3
-
     LDA #0
     SEC
-    SBC #BALL_SPEED
+    SBC #BALL_SPEED                                ; set speed
     STA ball_speed_y+1                      
-    STA ball_speed_x                               ; set speed ; collision from right
+    STA ball_speed_x                              
               
-    LDA #BALL_SPEED                                ; subtract player position
-    STA ball_speed_x                               ; set speed as result
+    LDA sprite_ball+SPRITE_X                       ; get ball position
+    CMP \1                                         ; check collision direction
+    BMI \3                                         ; branching if hit from left
+
+    LDA #BALL_SPEED                                ; set speed
+    STA ball_speed_x                               
     .endm    
 
     CheckCollisionWithBall sprite_player1+SPRITE_X, sprite_player1+SPRITE_Y, UpdateBall_NoCollision ; Check ball collision for player1
@@ -772,13 +763,13 @@ UpdateBall_NoCollision:
 UpdateBall_NoCollision2: 
 
     ; Move cloud
-    LDA sprite_cloudLeft + SPRITE_X
+    LDA sprite_cloud + SPRITE_X
     SEC
     SBC #1
-    STA sprite_cloudLeft + SPRITE_X
+    STA sprite_cloud + SPRITE_X
     CLC
     ADC #8
-    STA sprite_cloudRight + SPRITE_X
+    STA sprite_cloud + SPRITE2_X
 
     ; Copy sprite data to the PPU
     LDA #0
