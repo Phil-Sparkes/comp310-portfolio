@@ -34,6 +34,8 @@ BALL_HITBOX_HEIGHT   = 8
 BALL_SPEED           = 2
 NET_HEIGHT           = 150
 SPRITE_SCORE_START   = $80
+SPRITE_BOOST1_START  = $90
+SPRITE_BOOST2_START  = $A0
 
 BALL_SPAWN_X         = 128
 BALL_SPAWN_Y         = 130
@@ -42,6 +44,11 @@ PLAYER1_SPAWN_X      = 30
 PLAYER2_SPAWN_X      = 230
 PLAYER_SPAWN_Y       = 130
 
+FULL_BOOST           = 120
+FULL_BOOST_BAR       = 14
+BOOST_SEGMENT        = 8
+BOOST_CHANGE         = 5
+
     .rsset $0000
 joypad1_state        .rs 1
 joypad2_state        .rs 1
@@ -49,6 +56,12 @@ nametable_address    .rs 2
 
 player1_score        .rs 1
 player2_score        .rs 1
+
+player1_boost_bar    .rs 1
+player2_boost_bar    .rs 1
+player1_boost        .rs 1
+player2_boost        .rs 1
+boost_checker        .rs 1
 
 player1_speed        .rs 2   ; in subpixels/frame -- 16 bits
 player2_speed        .rs 2   ; in subpixels/frame -- 16 bits
@@ -66,15 +79,15 @@ sprite_player2       .rs 4
 sprite_ball          .rs 4
 
 sprite_net1          .rs 8
-sprite_net1Low       .rs 4
 sprite_net2          .rs 8
-sprite_net2Low       .rs 4
 
 sprite_player1Score  .rs 4
 sprite_player2Score  .rs 4
 
+sprite_player1Boost  .rs 8
+sprite_player2Boost  .rs 8
+
 sprite_cloud         .rs 8
-sprite_cloudRight    .rs 4
 
     .rsset $0000
 SPRITE_Y             .rs 1
@@ -86,9 +99,10 @@ SPRITE2_TILE         .rs 1
 SPRITE2_ATTRIB       .rs 1
 SPRITE2_X            .rs 1
 
-GRAVITY                = 9                ; in subpixels/frame^2
-JUMP_SPEED             = -(0 * 256 + 196) ; in subpixels/frame
+GRAVITY                = 9     ; in subpixels/frame^2
+JUMP_SPEED             = -196  ; in subpixels/frame
 SCREEN_BOTTOM_Y        = 160
+
 
     .bank 0
     .org $C000
@@ -203,7 +217,7 @@ InitialiseGame: ; begin subroutine
     LDA #$0F
     STA PPUDATA
 
-    ; Write the palette colours  ([Palette1])
+    ; Write the palette colours  ([Palette1]) - red/lightblue/grey
     LDA #$06
     STA PPUDATA
     LDA #$21
@@ -215,7 +229,7 @@ InitialiseGame: ; begin subroutine
     LDA #$0F
     STA PPUDATA
 
-    ; Write the palette colours  ([Palette2])
+    ; Write the palette colours  ([Palette2]) - blue/lightblue/grey
     LDA #$01
     STA PPUDATA
     LDA #$21
@@ -227,12 +241,24 @@ InitialiseGame: ; begin subroutine
     LDA #$0F
     STA PPUDATA
 
-    ; Write the palette colours  ([Palette3])
+    ; Write the palette colours  ([Palette3]) - white/grey
     LDA #$30
     STA PPUDATA
     LDA #$2D
     STA PPUDATA
     LDA #$2D
+    STA PPUDATA
+
+    ; Write the background colour
+    LDA #$0F
+    STA PPUDATA
+
+    ; Write the palette colours  ([Palette4]) - red/blue/orange
+    LDA #$06
+    STA PPUDATA
+    LDA #$27
+    STA PPUDATA
+    LDA #$1C
     STA PPUDATA
 
     ; Write sprite data for sprite 0 ([Player1])
@@ -333,6 +359,38 @@ InitialiseGame: ; begin subroutine
     LDA #128             ; X position
     STA sprite_cloud + SPRITE2_X   
 
+    ; Write sprite data for sprites 11 and 12 ([Player1Boost])
+    LDA #196              ; Y position
+    STA sprite_player1Boost + SPRITE_Y
+    STA sprite_player1Boost + SPRITE2_Y
+    LDA #$90             ; Tile number
+    STA sprite_player1Boost + SPRITE_TILE
+    LDA #$A0             
+    STA sprite_player1Boost + SPRITE2_TILE
+    LDA #1               ; Attributes
+    STA sprite_player1Boost + SPRITE_ATTRIB
+    STA sprite_player1Boost + SPRITE2_ATTRIB
+    LDA #16             ; X position
+    STA sprite_player1Boost + SPRITE_X     
+    LDA #24             ; X position
+    STA sprite_player1Boost + SPRITE2_X   
+
+    ; Write sprite data for sprites 13 and 14 ([Player2Boost])
+    LDA #196              ; Y position
+    STA sprite_player2Boost + SPRITE_Y
+    STA sprite_player2Boost + SPRITE2_Y
+    LDA #$90             ; Tile number
+    STA sprite_player2Boost + SPRITE_TILE
+    LDA #$A0             
+    STA sprite_player2Boost + SPRITE2_TILE
+    LDA #0               ; Attributes
+    STA sprite_player2Boost + SPRITE_ATTRIB
+    STA sprite_player2Boost + SPRITE2_ATTRIB
+    LDA #232             ; X position
+    STA sprite_player2Boost + SPRITE_X     
+    LDA #240             ; X position
+    STA sprite_player2Boost + SPRITE2_X   
+
     ; Load nametable data
     LDA #$20             ; Write address $2000 to PPUADDR register
     STA PPUADDR
@@ -431,26 +489,6 @@ ReadController:
     CPX #8
     BNE ReadController
 
-    ; React to Up button
-    LDA joypad1_state
-    AND #BUTTON_UP
-    BEQ ReadUp_Done  
-    LDA sprite_player1 + SPRITE_Y
-    CLC
-    ADC #-1
-    STA sprite_player1 + SPRITE_Y
-ReadUp_Done:
-
-    ; React to Down button
-    LDA joypad1_state
-    AND #BUTTON_DOWN
-    BEQ ReadDown_Done  
-    LDA sprite_player1 + SPRITE_Y
-    CLC
-    ADC #1
-    STA sprite_player1 + SPRITE_Y
-ReadDown_Done:
-
     ; React to Left button
     LDA joypad1_state
     AND #BUTTON_LEFT
@@ -475,8 +513,14 @@ ReadRight_Done:
     LDA joypad1_state
     AND #BUTTON_A
     BEQ ReadA_Done  
+    ; check if player has enough boost
+    LDA player1_boost
+    SEC
+    SBC #BOOST_CHANGE
+    BCC ReadA_Done
+    STA player1_boost
     ; Set player speed
-    LDA #Low(JUMP_SPEED)
+    LDA #LOW(JUMP_SPEED)
     STA player1_speed
     LDA #HIGH(JUMP_SPEED)
     STA player1_speed+1
@@ -500,26 +544,6 @@ ReadController2:
     INX
     CPX #8
     BNE ReadController2
-
-    ; React to Up button
-    LDA joypad2_state
-    AND #BUTTON_UP
-    BEQ ReadUp2_Done  
-    LDA sprite_player2 + SPRITE_Y
-    CLC
-    ADC #-1
-    STA sprite_player2 + SPRITE_Y
-ReadUp2_Done:
-
-    ; React to Down button
-    LDA joypad2_state
-    AND #BUTTON_DOWN
-    BEQ ReadDown2_Done  
-    LDA sprite_player2 + SPRITE_Y
-    CLC
-    ADC #1
-    STA sprite_player2 + SPRITE_Y
-ReadDown2_Done:
 
     ; React to Left button
     LDA joypad2_state
@@ -545,8 +569,14 @@ ReadRight2_Done:
     LDA joypad2_state
     AND #BUTTON_A
     BEQ ReadA2_Done  
+    ; check if player has enough boost
+    LDA player2_boost
+    SEC
+    SBC #BOOST_CHANGE
+    BCC ReadA2_Done
+    STA player2_boost
     ; Set player speed
-    LDA #Low(JUMP_SPEED)
+    LDA #LOW(JUMP_SPEED)
     STA player2_speed
     LDA #HIGH(JUMP_SPEED)
     STA player2_speed+1
@@ -577,6 +607,18 @@ ReadA2_Done:
     ; Check sign of speed
     LDA player1_speed+1
     BMI UpdatePlayer_ClampToTop
+   
+    ; Check full boost
+    LDA player1_boost
+    CMP #FULL_BOOST
+    NOP
+    BEQ UpdatePlayer_ClampToBottom
+    ; Recharge boost
+    LDA player1_boost
+    CLC
+    ADC #BOOST_CHANGE               
+    STA player1_boost     
+UpdatePlayer_ClampToBottom:
     LDA #SCREEN_BOTTOM_Y-1       ; Clamp to bottom
     JMP UpdatePlayer_DoClamping
 UpdatePlayer_ClampToTop:
@@ -612,6 +654,18 @@ UpdatePlayer_NoClamp:
     ; Check sign of speed
     LDA player2_speed+1
     BMI UpdatePlayer2_ClampToTop
+
+    ; Check full boost
+    LDA player2_boost
+    CMP #FULL_BOOST
+    NOP
+    BEQ UpdatePlayer2_ClampToBottom
+    ; Recharge boost
+    LDA player2_boost
+    CLC
+    ADC #BOOST_CHANGE               
+    STA player2_boost     
+UpdatePlayer2_ClampToBottom:
     LDA #SCREEN_BOTTOM_Y-1      ; Clamp to bottom
     JMP UpdatePlayer2_DoClamping
 UpdatePlayer2_ClampToTop:
@@ -647,6 +701,7 @@ UpdatePlayer2_NoClamp:
     BCC Updateball_NoClampY
     LDA ball_speed_y+1         ; Check sign of speed
     BMI Updateball_ClampToTop
+
     LDA #SCREEN_BOTTOM_Y-1     ; Clamp to bottom
     JMP Updateball_DoClampingY
 Updateball_ClampToTop:
@@ -770,6 +825,83 @@ UpdateBall_NoCollision2:
     CLC
     ADC #8
     STA sprite_cloud + SPRITE2_X
+
+    ; PLAYER 1 BOOST
+    Player1_BoostBar:
+    LDA #0
+    STA player1_boost_bar
+    LDA #BOOST_SEGMENT
+    STA boost_checker
+    Player1_Boost_Loop:
+    LDA boost_checker
+    CMP player1_boost
+    BPL Player1_NoBoost 
+    CLC
+    ADC #BOOST_SEGMENT
+    STA boost_checker
+    LDA player1_boost_bar
+    CLC
+    ADC #1
+    STA player1_boost_bar
+    CMP #FULL_BOOST_BAR
+    BNE Player1_Boost_Loop
+    Player1_NoBoost:
+    LDA player1_boost_bar
+    CMP #7
+    BMI Player1_FirstHalfBoost
+    CLC
+    ADC #SPRITE_BOOST2_START - 7
+    STA sprite_player1Boost + SPRITE2_TILE
+    LDA #SPRITE_BOOST1_START + 7
+    STA sprite_player1Boost + SPRITE_TILE
+    JMP Player1_BoostDone
+    Player1_FirstHalfBoost:
+    LDA player1_boost_bar
+    CLC
+    ADC #SPRITE_BOOST1_START
+    STA sprite_player1Boost + SPRITE_TILE
+    LDA #SPRITE_BOOST2_START
+    STA sprite_player1Boost + SPRITE2_TILE
+    Player1_BoostDone:
+
+    ; PLAYER 2 BOOST
+    Player2_BoostBar:
+    LDA #0
+    STA player2_boost_bar
+    LDA #BOOST_SEGMENT
+    STA boost_checker
+    Player2_Boost_Loop:
+    LDA boost_checker
+    CMP player2_boost
+    BPL Player2_NoBoost 
+    CLC
+    ADC #BOOST_SEGMENT
+    STA boost_checker
+    LDA player2_boost_bar
+    CLC
+    ADC #1
+    STA player2_boost_bar
+    CMP #FULL_BOOST_BAR
+    BNE Player2_Boost_Loop
+    Player2_NoBoost:
+    LDA player2_boost_bar
+    CMP #7
+    BMI Player2_FirstHalfBoost
+    CLC
+    ADC #SPRITE_BOOST2_START - 7
+    STA sprite_player2Boost + SPRITE2_TILE
+    LDA #SPRITE_BOOST1_START + 7
+    STA sprite_player2Boost + SPRITE_TILE
+    JMP Player2_BoostDone
+    Player2_FirstHalfBoost:
+    LDA player2_boost_bar
+    CLC
+    ADC #SPRITE_BOOST1_START
+    STA sprite_player2Boost + SPRITE_TILE
+    LDA #SPRITE_BOOST2_START
+    STA sprite_player2Boost + SPRITE2_TILE
+    Player2_BoostDone:
+
 
     ; Copy sprite data to the PPU
     LDA #0
