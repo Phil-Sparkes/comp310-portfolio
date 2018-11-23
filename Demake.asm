@@ -84,8 +84,11 @@ sprite_net2          .rs 8
 sprite_player1Score  .rs 4
 sprite_player2Score  .rs 4
 
-sprite_player1Boost  .rs 8
-sprite_player2Boost  .rs 8
+sprite_player1BoostBar  .rs 8
+sprite_player2BoostBar  .rs 8
+
+sprite_player1Boost  .rs 4
+sprite_player2Boost  .rs 4
 
 sprite_cloud         .rs 8
 
@@ -359,37 +362,57 @@ InitialiseGame: ; begin subroutine
     LDA #128             ; X position
     STA sprite_cloud + SPRITE2_X   
 
-    ; Write sprite data for sprites 11 and 12 ([Player1Boost])
+    ; Write sprite data for sprites 11 and 12 ([Player1BoostBar])
     LDA #196              ; Y position
-    STA sprite_player1Boost + SPRITE_Y
-    STA sprite_player1Boost + SPRITE2_Y
+    STA sprite_player1BoostBar + SPRITE_Y
+    STA sprite_player1BoostBar + SPRITE2_Y
     LDA #$90             ; Tile number
-    STA sprite_player1Boost + SPRITE_TILE
+    STA sprite_player1BoostBar + SPRITE_TILE
     LDA #$A0             
-    STA sprite_player1Boost + SPRITE2_TILE
+    STA sprite_player1BoostBar + SPRITE2_TILE
     LDA #1               ; Attributes
-    STA sprite_player1Boost + SPRITE_ATTRIB
-    STA sprite_player1Boost + SPRITE2_ATTRIB
+    STA sprite_player1BoostBar + SPRITE_ATTRIB
+    STA sprite_player1BoostBar + SPRITE2_ATTRIB
     LDA #16             ; X position
-    STA sprite_player1Boost + SPRITE_X     
+    STA sprite_player1BoostBar + SPRITE_X     
     LDA #24             ; X position
-    STA sprite_player1Boost + SPRITE2_X   
+    STA sprite_player1BoostBar + SPRITE2_X   
 
-    ; Write sprite data for sprites 13 and 14 ([Player2Boost])
+    ; Write sprite data for sprites 13 and 14 ([Player2BoostBar])
     LDA #196              ; Y position
-    STA sprite_player2Boost + SPRITE_Y
-    STA sprite_player2Boost + SPRITE2_Y
+    STA sprite_player2BoostBar + SPRITE_Y
+    STA sprite_player2BoostBar + SPRITE2_Y
     LDA #$90             ; Tile number
-    STA sprite_player2Boost + SPRITE_TILE
+    STA sprite_player2BoostBar + SPRITE_TILE
     LDA #$A0             
-    STA sprite_player2Boost + SPRITE2_TILE
+    STA sprite_player2BoostBar + SPRITE2_TILE
     LDA #0               ; Attributes
-    STA sprite_player2Boost + SPRITE_ATTRIB
-    STA sprite_player2Boost + SPRITE2_ATTRIB
+    STA sprite_player2BoostBar + SPRITE_ATTRIB
+    STA sprite_player2BoostBar + SPRITE2_ATTRIB
     LDA #232             ; X position
-    STA sprite_player2Boost + SPRITE_X     
+    STA sprite_player2BoostBar + SPRITE_X     
     LDA #240             ; X position
-    STA sprite_player2Boost + SPRITE2_X   
+    STA sprite_player2BoostBar + SPRITE2_X   
+
+    ; Write sprite data for sprite 15 ([Player1Boost])
+    LDA #0               ; Y position
+    STA sprite_player1Boost + SPRITE_Y
+    LDA #$14             ; Tile number
+    STA sprite_player1Boost + SPRITE_TILE
+    LDA #3               ; Attributes
+    STA sprite_player1Boost + SPRITE_ATTRIB
+    LDA #0               ; X position
+    STA sprite_player1Boost + SPRITE_X   
+
+    ; Write sprite data for sprite 16 ([Player1Boost])
+    LDA #0               ; Y position
+    STA sprite_player2Boost + SPRITE_Y
+    LDA #$14             ; Tile number
+    STA sprite_player2Boost + SPRITE_TILE
+    LDA #3               ; Attributes
+    STA sprite_player2Boost + SPRITE_ATTRIB
+    LDA #0               ; X position
+    STA sprite_player2Boost + SPRITE_X  
 
     ; Load nametable data
     LDA #$20             ; Write address $2000 to PPUADDR register
@@ -509,6 +532,10 @@ ReadLeft_Done:
     STA sprite_player1 + SPRITE_X
 ReadRight_Done:
 
+    ; Set boost sprite off screen
+    LDA #0
+    STA sprite_player1Boost + SPRITE_X
+    STA sprite_player1Boost + SPRITE_Y
     ; React to A button
     LDA joypad1_state
     AND #BUTTON_A
@@ -518,7 +545,14 @@ ReadRight_Done:
     SEC
     SBC #BOOST_CHANGE
     BCC ReadA_Done
-    STA player1_boost
+    STA player1_boost  
+    ; Set boost sprite below player
+    LDA sprite_player1 + SPRITE_X
+    STA sprite_player1Boost + SPRITE_X
+    LDA sprite_player1 + SPRITE_Y
+    CLC
+    ADC #6
+    STA sprite_player1Boost + SPRITE_Y
     ; Set player speed
     LDA #LOW(JUMP_SPEED)
     STA player1_speed
@@ -565,6 +599,10 @@ ReadLeft2_Done:
     STA sprite_player2 + SPRITE_X
 ReadRight2_Done:
 
+    ; Set boost sprite off screen
+    LDA #0
+    STA sprite_player2Boost + SPRITE_X
+    STA sprite_player2Boost + SPRITE_Y
     ; React to A button
     LDA joypad2_state
     AND #BUTTON_A
@@ -575,6 +613,13 @@ ReadRight2_Done:
     SBC #BOOST_CHANGE
     BCC ReadA2_Done
     STA player2_boost
+    ; Set boost sprite below player
+    LDA sprite_player2 + SPRITE_X
+    STA sprite_player2Boost + SPRITE_X
+    LDA sprite_player2 + SPRITE_Y
+    CLC
+    ADC #6
+    STA sprite_player2Boost + SPRITE_Y
     ; Set player speed
     LDA #LOW(JUMP_SPEED)
     STA player2_speed
@@ -826,81 +871,79 @@ UpdateBall_NoCollision2:
     ADC #8
     STA sprite_cloud + SPRITE2_X
 
-    ; PLAYER 1 BOOST
-    Player1_BoostBar:
+    ; PLAYER 1 BOOST BAR
     LDA #0
-    STA player1_boost_bar
-    LDA #BOOST_SEGMENT
-    STA boost_checker
-    Player1_Boost_Loop:
+    STA player1_boost_bar       ; Reset boost bar
+    LDA #BOOST_SEGMENT      
+    STA boost_checker           ; Reset boost checker
+    Player1_Boost_Checker_Loop:
     LDA boost_checker
-    CMP player1_boost
-    BPL Player1_NoBoost 
+    CMP player1_boost           ; branch if player boost is less than boost checker
+    BPL Player1_Boost_Check_Over     
     CLC
-    ADC #BOOST_SEGMENT
+    ADC #BOOST_SEGMENT          ; Add another segment to boost checker
     STA boost_checker
-    LDA player1_boost_bar
+    LDA player1_boost_bar       ; Increment boost bar
     CLC
     ADC #1
     STA player1_boost_bar
-    CMP #FULL_BOOST_BAR
-    BNE Player1_Boost_Loop
-    Player1_NoBoost:
+    CMP #FULL_BOOST_BAR         ; branch if full boost bar
+    BNE Player1_Boost_Checker_Loop
+    Player1_Boost_Check_Over:
     LDA player1_boost_bar
-    CMP #7
-    BMI Player1_FirstHalfBoost
+    CMP #7                     
+    BMI Player1_First_Half_Boost  ; branch if boost bar is less than 8
     CLC
-    ADC #SPRITE_BOOST2_START - 7
-    STA sprite_player1Boost + SPRITE2_TILE
+    ADC #SPRITE_BOOST2_START - 7   
+    STA sprite_player1BoostBar + SPRITE2_TILE  ; set sprite tile using boost bar value
     LDA #SPRITE_BOOST1_START + 7
-    STA sprite_player1Boost + SPRITE_TILE
-    JMP Player1_BoostDone
-    Player1_FirstHalfBoost:
+    STA sprite_player1BoostBar + SPRITE_TILE   ; set sprite tile to show full boost
+    JMP Player1_Boost_Bar_Set     ; Jump to end
+    Player1_First_Half_Boost:
     LDA player1_boost_bar
     CLC
     ADC #SPRITE_BOOST1_START
-    STA sprite_player1Boost + SPRITE_TILE
+    STA sprite_player1BoostBar + SPRITE_TILE   ; set sprite tile to show empty boost
     LDA #SPRITE_BOOST2_START
-    STA sprite_player1Boost + SPRITE2_TILE
-    Player1_BoostDone:
+    STA sprite_player1BoostBar + SPRITE2_TILE  ; set sprite tile using boost bar value
+    Player1_Boost_Bar_Set:
 
     ; PLAYER 2 BOOST
-    Player2_BoostBar:
     LDA #0
-    STA player2_boost_bar
-    LDA #BOOST_SEGMENT
-    STA boost_checker
-    Player2_Boost_Loop:
+    STA player2_boost_bar       ; Reset boost bar
+    LDA #BOOST_SEGMENT      
+    STA boost_checker           ; Reset boost checker
+    Player2_Boost_Checker_Loop:
     LDA boost_checker
-    CMP player2_boost
-    BPL Player2_NoBoost 
+    CMP player2_boost           ; branch if player boost is less than boost checker
+    BPL Player2_Boost_Check_Over     
     CLC
-    ADC #BOOST_SEGMENT
+    ADC #BOOST_SEGMENT          ; Add another segment to boost checker
     STA boost_checker
-    LDA player2_boost_bar
+    LDA player2_boost_bar       ; Increment boost bar
     CLC
     ADC #1
     STA player2_boost_bar
-    CMP #FULL_BOOST_BAR
-    BNE Player2_Boost_Loop
-    Player2_NoBoost:
+    CMP #FULL_BOOST_BAR         ; branch if full boost bar
+    BNE Player2_Boost_Checker_Loop
+    Player2_Boost_Check_Over:
     LDA player2_boost_bar
-    CMP #7
-    BMI Player2_FirstHalfBoost
+    CMP #7                     
+    BMI Player2_First_Half_Boost  ; branch if boost bar is less than 8
     CLC
-    ADC #SPRITE_BOOST2_START - 7
-    STA sprite_player2Boost + SPRITE2_TILE
+    ADC #SPRITE_BOOST2_START - 7   
+    STA sprite_player2BoostBar + SPRITE2_TILE  ; set sprite tile using boost bar value
     LDA #SPRITE_BOOST1_START + 7
-    STA sprite_player2Boost + SPRITE_TILE
-    JMP Player2_BoostDone
-    Player2_FirstHalfBoost:
+    STA sprite_player2BoostBar + SPRITE_TILE   ; set sprite tile to show full boost
+    JMP Player2_Boost_Bar_Set     ; Jump to end
+    Player2_First_Half_Boost:
     LDA player2_boost_bar
     CLC
     ADC #SPRITE_BOOST1_START
-    STA sprite_player2Boost + SPRITE_TILE
+    STA sprite_player2BoostBar + SPRITE_TILE   ; set sprite tile to show empty boost
     LDA #SPRITE_BOOST2_START
-    STA sprite_player2Boost + SPRITE2_TILE
-    Player2_BoostDone:
+    STA sprite_player2BoostBar + SPRITE2_TILE  ; set sprite tile using boost bar value
+    Player2_Boost_Bar_Set:
 
 
     ; Copy sprite data to the PPU
